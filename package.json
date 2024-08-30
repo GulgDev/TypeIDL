@@ -22,6 +22,9 @@
     "type",
     "runtime"
   ],
+  "repository": {
+    "url": "https://github.com/GulgDev/TypeIDL"
+  },
   "author": "gulg",
   "license": "ISC",
   "description": "TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users",
