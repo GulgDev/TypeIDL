@@ -1,0 +1,35 @@
+{
+  "name": "typeidl",
+  "version": "1.1.0",
+  "main": "./dist/index.js",
+  "exports": {
+    "default": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "tsp": {
+    "tscOptions": {
+      "parseAllJsDoc": true
+    }
+  },
+  "scripts": {
+    "prepublishOnly": "tsc"
+  },
+  "keywords": [
+    "idl",
+    "typescript",
+    "transform",
+    "validator",
+    "type",
+    "runtime"
+  ],
+  "author": "gulg",
+  "license": "ISC",
+  "description": "TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users",
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.0",
+    "@types/node": "^22.5.0",
+    "@types/ts-expose-internals": "npm:ts-expose-internals@5.5.4",
+    "ts-patch": "^3.2.1",
+    "typescript": "^5.5.4"
+  }
+}
