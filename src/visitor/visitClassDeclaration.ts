@@ -1,10 +1,11 @@
 import type ts from "typescript";
 import type { State } from "..";
+import type { Visitor } from "./util";
 import { resolve } from "path";
-import { visitNode } from "./visitNode";
 import makeMethodValidators from "../validators";
 import { visitClassMember } from "./visitClassMember";
 import { isInternalConstructor } from "../util/isInternalConstructor";
+import visitEachChild from "./util/visitEachChild";
 
 export interface ClassContext {
     classSymbol: ts.Symbol;
@@ -16,13 +17,13 @@ export interface ClassContext {
     initializers: ts.Expression[];
 }
 
-export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaration) => {
+export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<ts.ClassDeclaration> => (_hint, node) => {
     if (!node.name)
         return node;
 
     const { tsInstance, typeChecker, typeUtils, factory, idlFactory, config, ctx, metadata } = state;
 
-    let classDeclaration = tsInstance.visitEachChild(node, visitNode(state), ctx);
+    let classDeclaration = visitEachChild(tsInstance, node, visitor, ctx);
 
     let applyIDL: boolean = true;
     if (config.useIDLDecorator) {
@@ -60,24 +61,24 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
         initializers
     };
 
-    classDeclaration = tsInstance.visitEachChild(classDeclaration, visitClassMember(state, classCtx), ctx);
+    classDeclaration = visitEachChild(tsInstance, classDeclaration, visitClassMember(state, classCtx), ctx);
 
-    function visitInsideConstructor(node: ts.Node): ts.Node {
+    const visitInsideConstructor: Visitor = (_hint, node) => {
         if (tsInstance.isBinaryExpression(node) && node.operatorToken.kind === tsInstance.SyntaxKind.EqualsToken &&
             tsInstance.isPropertyAccessExpression(node.left) && node.left.expression.kind === tsInstance.SyntaxKind.ThisKeyword &&
-            mappedProps[node.left.name.escapedText.toString()]) {
+            mappedProps[node.left.name.text.toString()]) {
                 return factory.updateBinaryExpression(
                     node,
                     factory.updatePropertyAccessExpression(
                         node.left,
                         node.left.expression,
-                        mappedProps[node.left.name.escapedText.toString()]
+                        mappedProps[node.left.name.text.toString()]
                     ),
                     node.operatorToken,
                     node.right
                 );
         } else if (tsInstance.isCallExpression(node) && node.expression.kind === tsInstance.SyntaxKind.SuperKeyword) {
-            const callExpr = tsInstance.visitEachChild(node, visitInsideConstructor, ctx) as ts.CallExpression;
+            const callExpr = visitEachChild(tsInstance, node, visitInsideConstructor, ctx) as ts.CallExpression;
             return factory.createCommaListExpression([
                 factory.updateCallExpression(
                     callExpr,
@@ -93,13 +94,13 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
             ]);
         }
 
-        return tsInstance.visitEachChild(node, visitInsideConstructor, ctx);
+        return visitEachChild(tsInstance, node, visitInsideConstructor, ctx);
     }
 
     let hasConstructor = false;
     let hasInternalConstructor = false;
 
-    classDeclaration = tsInstance.visitEachChild(classDeclaration, (node) => {
+    classDeclaration = visitEachChild(tsInstance, classDeclaration, (_hint, node) => {
         if (tsInstance.isConstructorDeclaration(node) && node.body) {
             hasConstructor = true;
 
@@ -107,7 +108,7 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
             if (tags.find((tag) => tag.name === "internal") != null)
                 hasInternalConstructor = true;
 
-            const body = tsInstance.visitEachChild(node.body, visitInsideConstructor, ctx);
+            const body = visitEachChild(tsInstance, node.body, visitInsideConstructor, ctx);
             
             if (applyIDL)
                 return factory.updateConstructorDeclaration(
@@ -129,7 +130,7 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
                                         ),
                                         factory.createThrowStatement(
                                             factory.createNewExpression(
-                                                factory.createIdentifier("TypeError"),
+                                                idlFactory.createGlobalReference("TypeError"),
                                                 undefined,
                                                 [factory.createStringLiteral("Illegal constructor")]
                                             )
@@ -195,7 +196,7 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
                             ),
                             factory.createThrowStatement(
                                 factory.createNewExpression(
-                                    factory.createIdentifier("TypeError"),
+                                    idlFactory.createGlobalReference("TypeError"),
                                     undefined,
                                     [factory.createStringLiteral("Illegal constructor")]
                                 )
@@ -234,7 +235,7 @@ export const visitClassDeclaration = (state: State) => (node: ts.ClassDeclaratio
             [idlFactory.createInternalSetMiscExpression(
                 classSymbol,
                 factory.createCallExpression(
-                    factory.createIdentifier("Symbol"),
+                    idlFactory.createGlobalReference("Symbol"),
                     undefined,
                     []
                 )

@@ -18,7 +18,7 @@ export default function makeMethodValidators(
                 factory.createLogicalNot(
                     factory.createCallExpression(
                         factory.createPropertyAccessExpression(
-                            factory.createIdentifier("Object"),
+                            idlFactory.createGlobalReference("Object"),
                             "is"
                         ),
                         undefined,
@@ -51,7 +51,7 @@ export default function makeMethodValidators(
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createStringLiteral("Illegal invocation")]
                     )
@@ -69,21 +69,21 @@ export default function makeMethodValidators(
                             factory.createCallExpression(
                                 factory.createPropertyAccessExpression(
                                     factory.createPropertyAccessExpression(
-                                        factory.createIdentifier("Object"),
+                                        idlFactory.createGlobalReference("Object"),
                                         "isPrototypeOf"
                                     ),
                                     "call"
                                 ),
                                 undefined,
                                 [
-                                    factory.createIdentifier(classSymbol.name),
+                                    idlFactory.createReference(classSymbol),
                                     factory.createThis()
                                 ]
                             )
                         ),
                         factory.createStrictInequality(
                             factory.createThis(),
-                            factory.createIdentifier(classSymbol.name)
+                            idlFactory.createReference(classSymbol)
                         )
                     ) : factory.createLogicalNot(
                         idlFactory.createInternalHasExpression(
@@ -93,7 +93,7 @@ export default function makeMethodValidators(
                     ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createStringLiteral("Illegal invocation")]
                     )
@@ -112,7 +112,7 @@ export default function makeMethodValidators(
             ),
             factory.createThrowStatement(
                 factory.createNewExpression(
-                    factory.createIdentifier("TypeError"),
+                    idlFactory.createGlobalReference("TypeError"),
                     undefined,
                     [
                         factory.createAdd(
@@ -164,7 +164,7 @@ export default function makeMethodValidators(
                 factory.createBlock(
                     [factory.createThrowStatement(
                         factory.createNewExpression(
-                            factory.createIdentifier("TypeError"),
+                            idlFactory.createGlobalReference("TypeError"),
                             undefined,
                             [
                                 factory.createAdd(

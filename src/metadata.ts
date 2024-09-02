@@ -33,11 +33,11 @@ export const makeMetadataManager = (typeChecker: ts.TypeChecker): MetadataManage
 export const makeMetadataMemoize =
     <A extends any[], T>(
         key: string,
-        callback: (symbol: ts.Symbol, ...args: A) => T
+        callback: (metadata: MetadataManager, symbol: ts.Symbol, ...args: A) => T
     ): (metadata: MetadataManager, symbol: ts.Symbol, ...args: A) => T =>
         (metadata: MetadataManager, symbol: ts.Symbol, ...args: A) => {
             const symbolMetadata = metadata.getSymbolMetadata(symbol);
             return key in symbolMetadata ?
                 symbolMetadata[key] :
-                symbolMetadata[key] = callback(symbol, ...args);
+                symbolMetadata[key] = callback(metadata, symbol, ...args);
         };

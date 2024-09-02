@@ -5,10 +5,7 @@ export const makeCreateInternalGetMiscExpression =
     (internals: ts.Identifier, factory: ts.NodeFactory, metadata: MetadataManager) =>
     (symbol: ts.Symbol): ts.Expression =>
         factory.createCallExpression(
-            factory.createPropertyAccessExpression(
-                factory.createPropertyAccessExpression(internals, "misc"),
-                "get"
-            ),
+            factory.createPropertyAccessExpression(internals, "getMisc"),
             undefined,
             [factory.createNumericLiteral(metadata.getSymbolId(symbol))]
         );

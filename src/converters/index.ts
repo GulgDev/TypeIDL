@@ -19,7 +19,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -35,7 +35,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -51,7 +51,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -67,7 +67,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -83,7 +83,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -101,7 +101,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -116,26 +116,26 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                         factory.createCallExpression(
                             factory.createPropertyAccessExpression(
                                 factory.createPropertyAccessExpression(
-                                    factory.createIdentifier("Object"),
+                                    idlFactory.createGlobalReference("Object"),
                                     "isPrototypeOf"
                                 ),
                                 "call"
                             ),
                             undefined,
                             [
-                                factory.createIdentifier(type.symbol.name),
+                                idlFactory.createReference(type.symbol),
                                 factory.createIdentifier("value")
                             ]
                         )
                     ),
                     factory.createStrictInequality(
                         factory.createIdentifier("value"),
-                        factory.createIdentifier(type.symbol.name)
+                        idlFactory.createReference(type.symbol)
                     )
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -153,7 +153,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -174,12 +174,12 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                             factory.createBinaryExpression(
                                 factory.createIdentifier("value"),
                                 tsInstance.SyntaxKind.InstanceOfKeyword,
-                                factory.createIdentifier(type.symbol.name)
+                                idlFactory.createReference(type.symbol)
                             )
                     ),
                     factory.createThrowStatement(
                         factory.createNewExpression(
-                            factory.createIdentifier("TypeError"),
+                            idlFactory.createGlobalReference("TypeError"),
                             undefined,
                             [factory.createIdentifier("errorMessage")]
                         )
@@ -200,7 +200,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
@@ -213,7 +213,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 factory.createAssignment(
                     factory.createIdentifier("value"),
                     factory.createCallExpression(
-                        factory.createIdentifier("Boolean"),
+                        idlFactory.createGlobalReference("Boolean"),
                         undefined,
                         [factory.createIdentifier("value")]
                     )
@@ -226,7 +226,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 factory.createAssignment(
                     factory.createIdentifier("value"),
                     factory.createCallExpression(
-                        factory.createIdentifier("Number"),
+                        idlFactory.createGlobalReference("Number"),
                         undefined,
                         [factory.createIdentifier("value")]
                     )
@@ -239,7 +239,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 factory.createAssignment(
                     factory.createIdentifier("value"),
                     factory.createCallExpression(
-                        factory.createIdentifier("BigInt"),
+                        idlFactory.createGlobalReference("BigInt"),
                         undefined,
                         [factory.createIdentifier("value")]
                     )
@@ -252,7 +252,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
                 factory.createAssignment(
                     factory.createIdentifier("value"),
                     factory.createCallExpression(
-                        factory.createIdentifier("String"),
+                        idlFactory.createGlobalReference("String"),
                         undefined,
                         [factory.createIdentifier("value")]
                     )
@@ -267,7 +267,7 @@ function makeConverterUnwrapped(state: State, type: ts.Type): ts.Statement[] {
 }
 
 export default function makeConverter(state: State, type: ts.Type): ts.Expression {
-    const { tsInstance, typeChecker, factory } = state;
+    const { tsInstance, typeChecker, factory, idlFactory } = state;
 
     type = simplifyType(state, type);
 
@@ -277,7 +277,7 @@ export default function makeConverter(state: State, type: ts.Type): ts.Expressio
 
     const name = factory.createUniqueName("converter");
     state.typeConverters.set(type, name);
-    state.converters.push(
+    state.initializers.push(
         factory.createFunctionDeclaration(
             undefined,
             undefined,
@@ -305,7 +305,7 @@ export default function makeConverter(state: State, type: ts.Type): ts.Expressio
                     undefined,
                     factory.createKeywordTypeNode(tsInstance.SyntaxKind.AnyKeyword),
                     factory.createNewExpression(
-                        factory.createIdentifier("WeakMap"),
+                        idlFactory.createGlobalReference("WeakMap"),
                         undefined,
                         []
                     )

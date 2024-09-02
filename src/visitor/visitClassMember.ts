@@ -1,10 +1,10 @@
-import type ts from "typescript";
 import type { State } from "..";
 import type { ClassContext } from "./visitClassDeclaration";
+import type { Visitor } from "./util";
 import { isInternal } from "../util/isInternal";
 import makeMethodValidators from "../validators";
 
-export const visitClassMember = (state: State, classCtx: ClassContext) => (node: ts.Node) => {
+export const visitClassMember = (state: State, classCtx: ClassContext): Visitor => (_hint, node) => {
     const { tsInstance, typeChecker, factory, idlFactory, metadata } = state;
     const { classSymbol, classType, applyIDL, initializers } = classCtx;
 

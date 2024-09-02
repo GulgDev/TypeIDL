@@ -3,7 +3,7 @@ import type { State } from "..";
 import makeConverter from ".";
 
 export default function makeArrayConverter(state: State, type: ts.Type): ts.Statement[] {
-    const { tsInstance, typeChecker, factory } = state;
+    const { tsInstance, typeChecker, factory, idlFactory } = state;
     
     const elementType = typeChecker.getElementTypeOfArrayType(type)!;
     return [
@@ -30,7 +30,7 @@ export default function makeArrayConverter(state: State, type: ts.Type): ts.Stat
             ),
             factory.createThrowStatement(
                 factory.createNewExpression(
-                    factory.createIdentifier("TypeError"),
+                    idlFactory.createGlobalReference("TypeError"),
                     undefined,
                     [factory.createIdentifier("errorMessage")]
                 )

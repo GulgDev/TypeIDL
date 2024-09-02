@@ -1,9 +1,8 @@
 # TypeIDL
 
-TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users. It is based on WebIDL standard that is used in every modern JavaScript engine.
+TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users. It is based on WebIDL standard that is used in every modern JavaScript engine. TypeIDL is more than just type-checker, it also provides a variety of security features like internal properties and methods and untrusted globals mode.
 
-When used right, TypeIDL can help building classes and functions that will do what they must do and nothing more. TypeIDL handles validation just by utilizing your types. When a class is exposed, internal APIs should never access its public methods and properties, but instead use `#private` ones.
-
+TypeIDL can help you build intrinsic-like APIs by writing regular TS code:
 ```ts
 class API {
     stringProperty: string;
@@ -69,12 +68,13 @@ new API().foo("bar"); // foo'ing with bar
 
 (new API() as any).foo("bar"); // not working
 ```
-If constructor is not declared explicitly, TypeIDL would mark it as internal. Classes with internal constructors cannot be constructed outside of the project. But if you know JavaScript, you know that you can "create" class instance without calling the constructor:
-```js
-const customAPI = Object.create(API.prototype);
-customAPI instanceof API; // true
-```
-But how does TypeIDL know that the given object is legitemate class instance? The answer is simple: if the class was declared inside the project, TypeIDL inserts a special marker to every instance, that is applied to `this` object in the `constructor`. As the result, TypeIDL does not use `instanceof`, but instead utilize internal markers.
+If constructor is not declared explicitly, TypeIDL would mark it as internal by default. Classes with internal constructors cannot be constructed outside of the project.
+
+### Untrusted globals mode
+If you want to run your code in an untrusted environment, you can setup TypeIDL to not trust the global scope. If you do so, TypeIDL will store globals at the beginning of the module and use stored references instead of the actual globals. You can also prefix global object access with `globalThis.` to get the current state.
+
+### Ignoring TypeIDL transformation
+To ignore TypeIDL transformation when accessing properties, use square brackes: `object["property"]`.
 
 ## Installing
 First, install TypeIDL, TypeScript and ts-patch:
@@ -94,14 +94,14 @@ After that, you can write TypeScript code and compile it to JavaScript with `tsc
 
 ## Config
 You can pass options to TypeIDL to configure how it works:
-```json
+```js
 {
   "compilerOptions": {
     "plugins": [{
       "transform": "typeidl",
       "treatMissingConstructorAsInternal": true, // Treat missing constructors in IDL classes as internal
-      "useIDLDecorator": false, // Require @idl decorator to apply IDL validations to class
-      "trustGlobals": true // If set to false, TypeIDL will transform the source to save the globals when the module is loaded
+      "useIDLDecorator": false, // Require @idl decorator to apply IDL validations to classes
+      "trustGlobals": true // If set to false, TypeIDL will transform the source to store globals in the module scope
     }]
   }
 }

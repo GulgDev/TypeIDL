@@ -52,7 +52,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
                     factory.createBinaryExpression(
                         factory.createIdentifier("value"),
                         tsInstance.SyntaxKind.InstanceOfKeyword,
-                        factory.createIdentifier(type.symbol.name)
+                        idlFactory.createReference(type.symbol)
                     ),
                 factory.createReturnStatement(
                     factory.createIdentifier("value")
@@ -69,20 +69,20 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
                     factory.createCallExpression(
                         factory.createPropertyAccessExpression(
                             factory.createPropertyAccessExpression(
-                                factory.createIdentifier("Object"),
+                                idlFactory.createGlobalReference("Object"),
                                 "isPrototypeOf"
                             ),
                             "call"
                         ),
                         undefined,
                         [
-                            factory.createIdentifier(classTypeType.symbol.name),
+                            idlFactory.createReference(classTypeType.symbol),
                             factory.createIdentifier("value")
                         ]
                     ),
                     factory.createStrictEquality(
                         factory.createIdentifier("value"),
-                        factory.createIdentifier(classTypeType.symbol.name)
+                        idlFactory.createReference(classTypeType.symbol)
                     )
                 ),
                 factory.createReturnStatement(
@@ -277,7 +277,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
         result.push(
             factory.createReturnStatement(
                 factory.createCallExpression(
-                    factory.createIdentifier("String"),
+                    idlFactory.createGlobalReference("String"),
                     undefined,
                     [factory.createIdentifier("value")]
                 )
@@ -287,7 +287,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
         result.push(
             factory.createReturnStatement(
                 factory.createCallExpression(
-                    factory.createIdentifier("Number"),
+                    idlFactory.createGlobalReference("Number"),
                     undefined,
                     [factory.createIdentifier("value")]
                 )
@@ -297,7 +297,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
         result.push(
             factory.createReturnStatement(
                 factory.createCallExpression(
-                    factory.createIdentifier("Boolean"),
+                    idlFactory.createGlobalReference("Boolean"),
                     undefined,
                     [factory.createIdentifier("value")]
                 )
@@ -307,7 +307,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
         result.push(
             factory.createReturnStatement(
                 factory.createCallExpression(
-                    factory.createIdentifier("BigInt"),
+                    idlFactory.createGlobalReference("BigInt"),
                     undefined,
                     [factory.createIdentifier("value")]
                 )
@@ -317,7 +317,7 @@ export default function makeUnionConverter(state: State, type: ts.UnionType): ts
         result.push(
             factory.createThrowStatement(
                 factory.createNewExpression(
-                    factory.createIdentifier("TypeError"),
+                    idlFactory.createGlobalReference("TypeError"),
                     undefined,
                     [factory.createIdentifier("errorMessage")]
                 )

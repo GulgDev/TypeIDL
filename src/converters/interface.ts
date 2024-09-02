@@ -4,7 +4,7 @@ import makeConverter from ".";
 import stringifyType from "../util/stringifyType";
 
 export default function makeInterfaceConverter(state: State, type: ts.InterfaceType): ts.Statement[] {
-    const { factory, typeChecker } = state;
+    const { factory, idlFactory, typeChecker } = state;
 
     const result: ts.Statement[] = [];
 
@@ -68,7 +68,7 @@ export default function makeInterfaceConverter(state: State, type: ts.InterfaceT
                 ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
-                        factory.createIdentifier("TypeError"),
+                        idlFactory.createGlobalReference("TypeError"),
                         undefined,
                         [factory.createIdentifier("errorMessage")]
                     )
