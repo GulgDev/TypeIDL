@@ -1,13 +1,14 @@
 import type ts from "typescript";
 import type { State } from "..";
 import type { Visitor } from "./util";
-import { resolve } from "path";
 import makeMethodValidators from "../validators";
 import { visitClassMember } from "./visitClassMember";
 import { isInternalConstructor } from "../util/isInternalConstructor";
+import { hasIDL } from "../util/hasIDL";
 import visitEachChild from "./util/visitEachChild";
 
 export interface ClassContext {
+    classDeclaration: ts.ClassDeclaration;
     classSymbol: ts.Symbol;
     classType: ts.Type;
     baseType?: ts.BaseType;
@@ -15,32 +16,23 @@ export interface ClassContext {
     applyIDL: boolean;
 
     initializers: ts.Expression[];
+    staticInitializers: ts.Expression[];
 }
 
 export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<ts.ClassDeclaration> => (_hint, node) => {
     if (!node.name)
         return node;
 
-    const { tsInstance, typeChecker, typeUtils, factory, idlFactory, config, ctx, metadata } = state;
+    const { tsInstance, typeChecker, typeUtils, factory, idlFactory, config, ctx } = state;
 
     let classDeclaration = visitEachChild(tsInstance, node, visitor, ctx);
-
-    let applyIDL: boolean = true;
-    if (config.useIDLDecorator) {
-        const decorators = tsInstance.getDecorators(classDeclaration);
-        applyIDL = !!(decorators && decorators.find((decorator) => {
-            const symbol = typeUtils.getSymbol(decorator.expression);
-            return resolve(typeUtils.getDeclaredFileName(symbol)) === resolve(__dirname, "../index.d.ts") &&
-                    symbol.name === "idl";
-        }));
-    }
 
     const classSymbol = typeChecker.getSymbolAtLocation(classDeclaration.name!)!;
     const classType = typeChecker.getTypeOfSymbolAtLocation(classSymbol, classDeclaration);
 
-    const baseType = typeChecker.getTypeAtLocation(classDeclaration.name!).getBaseTypes()?.[0];
+    const applyIDL = hasIDL(classSymbol, config.useIDLDecorator, tsInstance, typeUtils);
 
-    const mappedProps: { [key: string]: ts.Identifier | ts.PrivateIdentifier } = {};
+    const baseType = typeChecker.getTypeAtLocation(classDeclaration.name!).getBaseTypes()?.[0];
 
     const initializers: ts.Expression[] = [
         idlFactory.createInternalMarkExpression(
@@ -49,35 +41,24 @@ export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<t
         )
     ];
 
-    const miscDeclarations: ts.Expression[] = [];
+    const staticInitializers: ts.Expression[] = [];
 
     const classCtx: ClassContext = {
+        classDeclaration,
         classSymbol,
         classType,
         baseType,
 
         applyIDL,
 
-        initializers
+        initializers,
+        staticInitializers
     };
 
     classDeclaration = visitEachChild(tsInstance, classDeclaration, visitClassMember(state, classCtx), ctx);
 
     const visitInsideConstructor: Visitor = (_hint, node) => {
-        if (tsInstance.isBinaryExpression(node) && node.operatorToken.kind === tsInstance.SyntaxKind.EqualsToken &&
-            tsInstance.isPropertyAccessExpression(node.left) && node.left.expression.kind === tsInstance.SyntaxKind.ThisKeyword &&
-            mappedProps[node.left.name.text.toString()]) {
-                return factory.updateBinaryExpression(
-                    node,
-                    factory.updatePropertyAccessExpression(
-                        node.left,
-                        node.left.expression,
-                        mappedProps[node.left.name.text.toString()]
-                    ),
-                    node.operatorToken,
-                    node.right
-                );
-        } else if (tsInstance.isCallExpression(node) && node.expression.kind === tsInstance.SyntaxKind.SuperKeyword) {
+        if (tsInstance.isCallExpression(node) && node.expression.kind === tsInstance.SyntaxKind.SuperKeyword) {
             const callExpr = visitEachChild(tsInstance, node, visitInsideConstructor, ctx) as ts.CallExpression;
             return factory.createCommaListExpression([
                 factory.updateCallExpression(
@@ -114,7 +95,18 @@ export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<t
                 return factory.updateConstructorDeclaration(
                     node,
                     node.modifiers,
-                    hasInternalConstructor ? [] : node.parameters,
+                    hasInternalConstructor ?
+                        [] :
+                        node.parameters.map((parameter, index) =>
+                            factory.createParameterDeclaration(
+                                parameter.modifiers,
+                                parameter.dotDotDotToken,
+                                factory.createIdentifier("arg" + index),
+                                parameter.questionToken,
+                                parameter.type,
+                                parameter.initializer
+                            )
+                        ),
                     factory.updateBlock(
                         body,
                         [
@@ -159,9 +151,39 @@ export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<t
                                         )
                                     )
                                 ] :
-                                makeMethodValidators(
-                                    state, classSymbol, false, classType.getConstructSignatures()[0],
-                                    `Failed to construct '${classSymbol.name}'`, false),
+                                [
+                                    ...makeMethodValidators(
+                                        state, classSymbol, true, classType.getConstructSignatures()[0],
+                                        `Failed to construct '${classSymbol.name}'`),
+                                    factory.createVariableStatement(
+                                        undefined,
+                                        factory.createVariableDeclarationList(
+                                            [factory.createVariableDeclaration(
+                                                factory.createArrayBindingPattern([
+                                                    ...node.parameters.map((parameter) =>
+                                                        factory.createBindingElement(
+                                                            parameter.dotDotDotToken,
+                                                            undefined,
+                                                            parameter.name,
+                                                            parameter.initializer
+                                                        )
+                                                    )
+                                                ]),
+                                                undefined,
+                                                undefined,
+                                                factory.createArrayLiteralExpression(
+                                                    node.parameters.map((parameter, index) => {
+                                                        let node: ts.Expression = factory.createIdentifier("arg" + index);
+                                                        if (parameter.dotDotDotToken)
+                                                            node = factory.createSpreadElement(node);
+                                                        return node;
+                                                    })
+                                                )
+                                            )],
+                                            tsInstance.NodeFlags.Let
+                                        )
+                                    )
+                                ],
                             ...baseType ? [] : initializers.map(factory.createExpressionStatement),
                             ...body.statements
                         ]
@@ -222,16 +244,16 @@ export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<t
             classDeclaration.heritageClauses,
             [
                 ...classDeclaration.members,
-                ...miscDeclarations.length === 0 ? [] : [factory.createPropertyDeclaration(
+                ...staticInitializers.length === 0 ? [] : [factory.createPropertyDeclaration(
                     factory.createModifiersFromModifierFlags(tsInstance.ModifierFlags.Static),
                     declarationsName,
                     undefined,
                     undefined,
-                    factory.createCommaListExpression(miscDeclarations)
+                    factory.createCommaListExpression(staticInitializers)
                 )]
             ]
         ),
-        ...isInternalConstructor(metadata, classSymbol, config.treatMissingConstructorAsInternal, tsInstance, typeChecker) ?
+        ...isInternalConstructor(classSymbol, config.treatMissingConstructorAsInternal, tsInstance, typeChecker) ?
             [idlFactory.createInternalSetMiscExpression(
                 classSymbol,
                 factory.createCallExpression(
@@ -240,7 +262,7 @@ export const visitClassDeclaration = (state: State, visitor: Visitor): Visitor<t
                     []
                 )
             )] : [],
-        ...miscDeclarations.length === 0 ? [] : [factory.createExpressionStatement(
+        ...staticInitializers.length === 0 ? [] : [factory.createExpressionStatement(
             factory.createDeleteExpression(
                 factory.createPropertyAccessExpression(
                     factory.createIdentifier(classSymbol.name),

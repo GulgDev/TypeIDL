@@ -1,10 +1,11 @@
 import type ts from "typescript";
 import type { State } from "..";
+import { getSymbolMetadata } from "../metadata";
 import { isGlobal } from "../util/isGlobal";
 import { type Visitor, VisitHint } from "./util";
 
 export const visitIdentifier = (state: State): Visitor<ts.Identifier> => (hint, node) => {
-    const { tsInstance, typeChecker, idlFactory, config, metadata } = state;
+    const { tsInstance, typeChecker, idlFactory, config } = state;
 
     if (config.trustGlobals)
         return node;
@@ -16,7 +17,7 @@ export const visitIdentifier = (state: State): Visitor<ts.Identifier> => (hint, 
     if (!symbol)
         return node;
 
-    if (metadata.getSymbolMetadata(symbol).intrinsic = symbol.name !== "globalThis" && isGlobal(metadata, symbol, tsInstance, typeChecker))
+    if (getSymbolMetadata(symbol).intrinsic = symbol.name !== "globalThis" && isGlobal(symbol, tsInstance, typeChecker))
         return idlFactory.createGlobalReference(node.text);
     
     return node;

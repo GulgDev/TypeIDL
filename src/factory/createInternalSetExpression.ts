@@ -1,8 +1,7 @@
 import type ts from "typescript";
-import type { MetadataManager } from "../metadata";
 
 export const makeCreateInternalSetExpression =
-    (internals: ts.Identifier, factory: ts.NodeFactory, metadata: MetadataManager) =>
+    (internals: ts.Identifier, tsInstance: typeof ts, factory: ts.NodeFactory) =>
     (expression: ts.Expression, symbol: ts.Symbol, value: ts.Expression): ts.Expression =>
         factory.createCallExpression(
             factory.createPropertyAccessExpression(internals, "set"),
@@ -11,7 +10,7 @@ export const makeCreateInternalSetExpression =
                 expression,
                 factory.createPropertyAccessExpression(
                     internals,
-                    `internal${metadata.getSymbolId(symbol)}`
+                    `internal${tsInstance.getSymbolId(symbol)}`
                 ),
                 value
             ]

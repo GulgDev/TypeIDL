@@ -1,5 +1,4 @@
 import type ts from "typescript";
-import type { MetadataManager } from "../metadata";
 import { isGlobal } from "../util/isGlobal";
 import { makeCreateGlobalReference } from "./createGlobalReference";
 
@@ -9,10 +8,9 @@ export const makeCreateReference =
         identifiers: { [key: string]: ts.Identifier },
         tsInstance: typeof ts,
         typeChecker: ts.TypeChecker,
-        factory: ts.NodeFactory,
-        metadata: MetadataManager
+        factory: ts.NodeFactory
     ) =>
     (symbol: ts.Symbol): ts.Identifier =>
-        (isGlobal(metadata, symbol, tsInstance, typeChecker) ?
+        (isGlobal(symbol, tsInstance, typeChecker) ?
             makeCreateGlobalReference(references, identifiers, factory) :
             factory.createIdentifier)(symbol.name);

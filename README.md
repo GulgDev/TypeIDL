@@ -1,5 +1,8 @@
 # TypeIDL
 
+[![npm version](https://badge.fury.io/js/typeidl.svg)](https://www.npmjs.com/package/typeidl)
+[![NPM Downloads](https://img.shields.io/npm/dm/typeidl)](https://www.npmjs.com/package/typeidl)
+
 TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users. It is based on WebIDL standard that is used in every modern JavaScript engine. TypeIDL is more than just type-checker, it also provides a variety of security features like internal properties and methods and untrusted globals mode.
 
 TypeIDL can help you build intrinsic-like APIs by writing regular TS code:

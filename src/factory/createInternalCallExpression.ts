@@ -1,9 +1,8 @@
 import type ts from "typescript";
-import type { MetadataManager } from "../metadata";
 
 export const makeCreateInternalCallExpression =
-    (internals: ts.Identifier, factory: ts.NodeFactory, metadata: MetadataManager) =>
-    (expression: ts.Expression, symbol: ts.Symbol, args: ts.NodeArray<ts.Expression>): ts.Expression =>
+    (internals: ts.Identifier, tsInstance: typeof ts, factory: ts.NodeFactory) =>
+    (expression: ts.Expression, symbol: ts.Symbol, argumentsExpression: ts.Expression): ts.Expression =>
         factory.createCallExpression(
             factory.createPropertyAccessExpression(internals, "call"),
             undefined,
@@ -11,8 +10,8 @@ export const makeCreateInternalCallExpression =
                 expression,
                 factory.createPropertyAccessExpression(
                     internals,
-                    `internal${metadata.getSymbolId(symbol)}`
+                    `internal${tsInstance.getSymbolId(symbol)}`
                 ),
-                factory.createArrayLiteralExpression(args)
+                argumentsExpression
             ]
         );

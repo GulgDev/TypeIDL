@@ -1,6 +1,6 @@
 {
   "name": "typeidl",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "main": "./dist/index.js",
   "exports": {
     "default": "./dist/index.js",
@@ -12,7 +12,8 @@
     }
   },
   "scripts": {
-    "prepublishOnly": "tsc"
+    "build": "tsc",
+    "test": "mocha"
   },
   "keywords": [
     "idl",
@@ -30,8 +31,14 @@
   "description": "TypeIDL is a TypeScript transformer for building clean API that can be safely exposed to users",
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",
+    "@types/mocha": "^10.0.7",
     "@types/node": "^22.5.0",
+    "@types/require-from-string": "^1.2.3",
     "@types/ts-expose-internals": "npm:ts-expose-internals@5.5.4",
+    "mocha": "^10.7.3",
+    "require-from-string": "^2.0.2",
+    "rollup": "^4.21.2",
+    "ts-node": "^10.9.2",
     "ts-patch": "^3.2.1",
     "typescript": "^5.5.4"
   }

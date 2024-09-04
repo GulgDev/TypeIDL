@@ -1,12 +1,14 @@
+import type ts from "typescript";
 import type { State } from "..";
 import type { ClassContext } from "./visitClassDeclaration";
 import type { Visitor } from "./util";
+import { createMirror } from "../util/createMirror";
 import { isInternal } from "../util/isInternal";
 import makeMethodValidators from "../validators";
 
 export const visitClassMember = (state: State, classCtx: ClassContext): Visitor => (_hint, node) => {
-    const { tsInstance, typeChecker, factory, idlFactory, metadata } = state;
-    const { classSymbol, classType, applyIDL, initializers } = classCtx;
+    const { tsInstance, typeChecker, factory, idlFactory } = state;
+    const { classSymbol, applyIDL, initializers, staticInitializers } = classCtx;
 
     if (tsInstance.isMethodDeclaration(node) && node.body) {
         const symbol = typeChecker.getSymbolAtLocation(node.name)!;
@@ -14,11 +16,16 @@ export const visitClassMember = (state: State, classCtx: ClassContext): Visitor 
             return node;
         const type = typeChecker.getNonNullableType(typeChecker.getTypeOfSymbol(symbol));
 
-        if (isInternal(metadata, symbol, typeChecker)) {
+        const isStatic = (tsInstance.modifiersToFlags(node.modifiers) & tsInstance.ModifierFlags.Static) !== 0;
+
+        const self = isStatic ? factory.createIdentifier(classSymbol.name) : factory.createThis();
+        const initializersTarget = isStatic ? staticInitializers : initializers;
+
+        if (isInternal(symbol, typeChecker)) {
             state.addInternal(symbol);
-            initializers.push(
+            initializersTarget.push(
                 idlFactory.createInternalSetExpression(
-                    factory.createThis(),
+                    self,
                     symbol,
                     factory.createFunctionExpression(
                         undefined,
@@ -32,110 +39,134 @@ export const visitClassMember = (state: State, classCtx: ClassContext): Visitor 
                 )
             );
             return;
-        } else if (applyIDL)
-            return factory.updateMethodDeclaration(
-                node,
+        } else if (applyIDL) {
+            const mirrorSymbol = createMirror(symbol, typeChecker);
+            state.addInternal(mirrorSymbol);
+            initializersTarget.push(
+                idlFactory.createInternalSetExpression(
+                    self,
+                    mirrorSymbol,
+                    factory.createFunctionExpression(
+                        undefined,
+                        node.asteriskToken,
+                        symbol.name,
+                        node.typeParameters,
+                        node.parameters,
+                        node.type,
+                        node.body
+                    )
+                )
+            );
+            
+            return factory.createMethodDeclaration(
                 node.modifiers,
                 node.asteriskToken,
                 node.name,
                 node.questionToken,
                 node.typeParameters,
-                node.parameters,
+                node.parameters.map((parameter, index) =>
+                    factory.createParameterDeclaration(
+                        parameter.modifiers,
+                        parameter.dotDotDotToken,
+                        factory.createIdentifier("arg" + index),
+                        parameter.questionToken,
+                        parameter.type,
+                        parameter.initializer
+                    )
+                ),
                 node.type,
-                factory.updateBlock(node.body, [
+                factory.createBlock([
                     ...makeMethodValidators(
                         state,
                         classSymbol,
-                        node.modifiers?.find((modifier) => modifier.kind === tsInstance.SyntaxKind.StaticKeyword) != null,
+                        isStatic,
                         type.getCallSignatures()[0],
                         `Failed to execute '${symbol.name}' on '${classSymbol.name}'`
                     ),
-                    ...node.body.statements
-                ])
+                    factory.createReturnStatement(
+                        idlFactory.createInternalCallExpression(
+                            self,
+                            mirrorSymbol,
+                            factory.createArrayLiteralExpression(
+                                node.parameters.map((parameter, index) => {
+                                    let node: ts.Expression = factory.createIdentifier("arg" + index);
+                                    if (parameter.dotDotDotToken)
+                                        node = factory.createSpreadElement(node);
+                                    return node;
+                                })
+                            )
+                        )
+                    )
+                ], true)
             );
+        }
     } else if (tsInstance.isPropertyDeclaration(node)) {
         const symbol = typeChecker.getSymbolAtLocation(node.name)!;
         if (symbol.name.startsWith("#"))
             return node;
 
-        if (isInternal(metadata, symbol, typeChecker)) {
+        const isStatic = (tsInstance.modifiersToFlags(node.modifiers) & tsInstance.ModifierFlags.Static) !== 0;
+
+        const self = isStatic ? factory.createIdentifier(classSymbol.name) : factory.createThis();
+        const initializersTarget = isStatic ? staticInitializers : initializers;
+
+        if (isInternal(symbol, typeChecker)) {
             state.addInternal(symbol);
-            if (node.initializer)
-                initializers.push(
-                    idlFactory.createInternalSetExpression(
-                        factory.createThis(),
-                        symbol,
-                        node.initializer
-                    )
-                );
+            initializersTarget.push(
+                idlFactory.createInternalSetExpression(
+                    self,
+                    symbol,
+                    node.initializer ?? factory.createVoidZero()
+                )
+            );
             return;
         } else if (applyIDL) {
-            const type = typeChecker.getTypeAtLocation(node.type!);
-
-            const existingProperty = typeChecker.getPrivateIdentifierPropertyOfType(classType, "#" + symbol.name, node);
-            const useExisting =
-                existingProperty != null &&
-                typeChecker.isTypeAssignableTo(type, typeChecker.getTypeOfSymbol(existingProperty));
-
-            const privateName = useExisting ?
-                factory.createPrivateIdentifier("#" + symbol.name) :
-                factory.createUniquePrivateName("#" + symbol.name);
-
-            const accessorsModifiers = node.modifiers?.filter((modifier) => 
-                modifier.kind === tsInstance.SyntaxKind.StaticKeyword);
-
-            const declaration = useExisting ? [] : [
-                factory.updatePropertyDeclaration(
-                    node,
-                    node.modifiers,
-                    privateName,
-                    node.questionToken ?? node.exclamationToken,
-                    node.type,
-                    node.initializer
+            const mirrorSymbol = createMirror(symbol, typeChecker);
+            state.addInternal(mirrorSymbol);
+            initializersTarget.push(
+                idlFactory.createInternalSetExpression(
+                    self,
+                    mirrorSymbol,
+                    node.initializer ?? factory.createVoidZero()
                 )
-            ];
+            );
 
-            if (node.modifiers?.find((modifier) => modifier.kind === tsInstance.SyntaxKind.ReadonlyKeyword)) {
-                // TODO
-                // mappedProps[symbol.name] = privateName;
-                return [
-                    ...declaration,
-                    factory.createGetAccessorDeclaration(
-                        accessorsModifiers,
-                        node.name,
-                        [],
-                        node.type,
-                        factory.createBlock([
-                            factory.createReturnStatement(
-                                factory.createPropertyAccessExpression(
-                                    factory.createThis(),
-                                    privateName
-                                )
-                            )
-                        ])
+            const getAccessor = factory.createGetAccessorDeclaration(
+                node.modifiers,
+                node.name,
+                [],
+                node.type,
+                factory.createBlock([
+                    factory.createReturnStatement(
+                        idlFactory.createInternalGetExpression(
+                            self,
+                            mirrorSymbol
+                        )
                     )
-                ];
-            } else {
+                ])
+            );
+
+            if (node.modifiers?.find((modifier) => modifier.kind === tsInstance.SyntaxKind.ReadonlyKeyword))
+                return getAccessor;
+            else {
                 const valueParameterDeclaration = factory.createParameterDeclaration(
                     undefined,
                     undefined,
-                    "value",
+                    "arg0",
                     undefined,
                     node.type,
                     undefined
                 );
                 const setAccessor = factory.createSetAccessorDeclaration(
-                    accessorsModifiers,
+                    node.modifiers,
                     node.name,
                     [valueParameterDeclaration],
                     factory.createBlock([
                         factory.createExpressionStatement(
-                            factory.createAssignment(
-                                factory.createPropertyAccessExpression(
-                                    factory.createThis(),
-                                    privateName
-                                ),
-                                factory.createIdentifier("value")
+                            idlFactory.createInternalSetExpression(
+                                self,
+                                mirrorSymbol,
+                                factory.createIdentifier("arg0")
                             )
                         )
                     ], true)
@@ -143,25 +174,13 @@ export const visitClassMember = (state: State, classCtx: ClassContext): Visitor 
                 tsInstance.setParentRecursive(setAccessor, false);
                 const valueParameter = typeChecker.createSymbol(
                     tsInstance.SymbolFlags.FunctionScopedVariable,
-                    factory.createIdentifier("value").escapedText
+                    "arg0" as ts.__String
                 );
                 valueParameter.valueDeclaration = valueParameterDeclaration;
+                //valueParameterDeclaration.symbol = valueParameter;
+                tsInstance.setParent(setAccessor, classCtx.classDeclaration);
                 return [
-                    ...declaration,
-                    factory.createGetAccessorDeclaration(
-                        accessorsModifiers,
-                        node.name,
-                        [],
-                        node.type,
-                        factory.createBlock([
-                            factory.createReturnStatement(
-                                factory.createPropertyAccessExpression(
-                                    factory.createThis(),
-                                    privateName
-                                )
-                            )
-                        ])
-                    ),
+                    getAccessor,
                     factory.updateSetAccessorDeclaration(
                         setAccessor,
                         setAccessor.modifiers,
@@ -173,7 +192,7 @@ export const visitClassMember = (state: State, classCtx: ClassContext): Visitor 
                                 ...makeMethodValidators(
                                     state,
                                     classSymbol,
-                                    node.modifiers?.find((modifier) => modifier.kind === tsInstance.SyntaxKind.StaticKeyword) != null,
+                                    isStatic,
                                     typeChecker.createSignature(
                                         undefined,
                                         undefined,
@@ -197,19 +216,59 @@ export const visitClassMember = (state: State, classCtx: ClassContext): Visitor 
         const symbol = typeChecker.getSymbolAtLocation(node.name)!;
         if (symbol.name.startsWith("#"))
             return node;
+
+        const isStatic = (tsInstance.modifiersToFlags(node.modifiers) & tsInstance.ModifierFlags.Static) !== 0;
+
         const type = typeChecker.getTypeOfSymbol(symbol);
         return factory.updateSetAccessorDeclaration(
             node,
             node.modifiers,
             node.name,
-            node.parameters,
+            node.parameters.map((parameter, index) =>
+                factory.createParameterDeclaration(
+                    parameter.modifiers,
+                    parameter.dotDotDotToken,
+                    factory.createIdentifier("arg" + index),
+                    parameter.questionToken,
+                    parameter.type,
+                    parameter.initializer
+                )
+            ),
             factory.updateBlock(node.body, [
                 ...makeMethodValidators(
                     state,
                     classSymbol,
-                    node.modifiers?.find((modifier) => modifier.kind === tsInstance.SyntaxKind.StaticKeyword) != null,
+                    isStatic,
                     type.getCallSignatures()[0],
                     `Failed to set an indexed property '${symbol.name}' on '${classSymbol.name}'`
+                ),
+                factory.createVariableStatement(
+                    undefined,
+                    factory.createVariableDeclarationList(
+                        [factory.createVariableDeclaration(
+                            factory.createArrayBindingPattern([
+                                ...node.parameters.map((parameter) =>
+                                    factory.createBindingElement(
+                                        parameter.dotDotDotToken,
+                                        undefined,
+                                        parameter.name,
+                                        parameter.initializer
+                                    )
+                                )
+                            ]),
+                            undefined,
+                            undefined,
+                            factory.createArrayLiteralExpression(
+                                node.parameters.map((parameter, index) => {
+                                    let node: ts.Expression = factory.createIdentifier("arg" + index);
+                                    if (parameter.dotDotDotToken)
+                                        node = factory.createSpreadElement(node);
+                                    return node;
+                                })
+                            )
+                        )],
+                        tsInstance.NodeFlags.Let
+                    )
                 ),
                 ...node.body.statements
             ])

@@ -1,0 +1,6 @@
+/docs
+/src
+/lib
+/test
+tsconfig.json
+.mocharc.json

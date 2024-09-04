@@ -1,6 +1,6 @@
 import type ts from "typescript";
-import type { MetadataManager } from "../metadata";
 import { makeCreateFunctionApplyCall } from "./createFunctionApplyCall";
+import { makeCreateMethodCall } from "./createMethodCall";
 import { makeCreateInternalGetExpression } from "./createInternalGetExpression";
 import { makeCreateInternalSetExpression } from "./createInternalSetExpression";
 import { makeCreateInternalDeleteExpression } from "./createInternalDeleteExpression";
@@ -16,13 +16,16 @@ import { makeCreateReference } from "./createReference";
 import { makeCreateInstancePropertyAccessorsReference } from "./createInstancePropertyAccessorsReference";
 import { makeCreateInstanceMethodReference } from "./createInstanceMethodReference";
 
+// @TODO: Pass getIDLFactory function
+
 export interface IDLFactory {
     createFunctionApplyCall(target: ts.Expression, thisArg: ts.Expression, argumentsExpression?: ts.Expression): ts.CallExpression;
+    createMethodCall(clazz: string, method: string, target: ts.Expression, argumentsList: readonly ts.Expression[]): ts.CallExpression;
 
     createInternalGetExpression(expression: ts.Expression, symbol: ts.Symbol): ts.Expression;
     createInternalSetExpression(expression: ts.Expression, symbol: ts.Symbol, value: ts.Expression): ts.Expression;
     createInternalDeleteExpression(expression: ts.Expression, symbol: ts.Symbol): ts.Expression;
-    createInternalCallExpression(expression: ts.Expression, symbol: ts.Symbol, args: ts.NodeArray<ts.Expression>): ts.Expression;
+    createInternalCallExpression(expression: ts.Expression, symbol: ts.Symbol, argumentsExpression: ts.Expression): ts.Expression;
     createInternalGetMiscExpression(symbol: ts.Symbol): ts.Expression;
     createInternalSetMiscExpression(symbol: ts.Symbol, value: ts.Expression): ts.Expression;
     createInternalMarkExpression(expression: ts.Expression, symbol: ts.Symbol): ts.Expression;
@@ -49,28 +52,31 @@ export const makeFactory =
         tsInstance: typeof ts,
         typeChecker: ts.TypeChecker,
         factory: ts.NodeFactory,
-        metadata: MetadataManager,
         trustGlobals: boolean
     ): IDLFactory => ({
         createFunctionApplyCall: trustGlobals ?
             (target, thisArg, argumentsExpression = factory.createArrayLiteralExpression()) =>
                 factory.createFunctionApplyCall(target, thisArg, argumentsExpression) :
             makeCreateFunctionApplyCall(internals, factory),
+        createMethodCall: trustGlobals ?
+            (_clazz, method, target, argumentsList) =>
+                factory.createMethodCall(target, method, argumentsList) :
+            makeCreateMethodCall(internals, initializers, references, instanceMethodReferences, identifiers, tsInstance, factory),
 
-        createInternalGetExpression: makeCreateInternalGetExpression(internals, factory, metadata),
-        createInternalSetExpression: makeCreateInternalSetExpression(internals, factory, metadata),
-        createInternalDeleteExpression: makeCreateInternalDeleteExpression(internals, factory, metadata),
-        createInternalCallExpression: makeCreateInternalCallExpression(internals, factory, metadata),
-        createInternalGetMiscExpression: makeCreateInternalGetMiscExpression(internals, factory, metadata),
-        createInternalSetMiscExpression: makeCreateInternalSetMiscExpression(internals, factory, metadata),
-        createInternalMarkExpression: makeCreateInternalMarkExpression(internals, factory, metadata),
-        createInternalHasExpression: makeCreateInternalHasExpression(internals, factory, metadata),
+        createInternalGetExpression: makeCreateInternalGetExpression(internals, tsInstance, factory),
+        createInternalSetExpression: makeCreateInternalSetExpression(internals, tsInstance, factory),
+        createInternalDeleteExpression: makeCreateInternalDeleteExpression(internals, tsInstance, factory),
+        createInternalCallExpression: makeCreateInternalCallExpression(internals, tsInstance, factory),
+        createInternalGetMiscExpression: makeCreateInternalGetMiscExpression(internals, tsInstance, factory),
+        createInternalSetMiscExpression: makeCreateInternalSetMiscExpression(internals, tsInstance, factory),
+        createInternalMarkExpression: makeCreateInternalMarkExpression(internals, tsInstance, factory),
+        createInternalHasExpression: makeCreateInternalHasExpression(internals, tsInstance, factory),
 
         createIdentifier: makeCreateIdentifier(identifiers, factory),
 
         createReference: trustGlobals ?
             (symbol: ts.Symbol) => factory.createIdentifier(symbol.name) :
-            makeCreateReference(references, identifiers, tsInstance, typeChecker, factory, metadata),
+            makeCreateReference(references, identifiers, tsInstance, typeChecker, factory),
         createPropertyReference: makeCreatePropertyReference(references, factory),
         createGlobalReference: trustGlobals ? factory.createIdentifier : makeCreateGlobalReference(references, identifiers, factory),
 

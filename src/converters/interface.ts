@@ -16,12 +16,10 @@ export default function makeInterfaceConverter(state: State, type: ts.InterfaceT
                     "cached",
                     undefined,
                     typeChecker.typeToTypeNode(type, undefined, undefined),
-                    factory.createCallExpression(
-                        factory.createPropertyAccessExpression(
-                            factory.createIdentifier("cache"),
-                            "get"
-                        ),
-                        undefined,
+                    idlFactory.createMethodCall(
+                        "WeakMap",
+                        "get",
+                        factory.createIdentifier("cache"),
                         [factory.createIdentifier("value")]
                     )
                 )],
@@ -92,12 +90,10 @@ export default function makeInterfaceConverter(state: State, type: ts.InterfaceT
     );
     result.push(
         factory.createExpressionStatement(
-            factory.createCallExpression(
-                factory.createPropertyAccessExpression(
-                    factory.createIdentifier("cache"),
-                    "set"
-                ),
-                undefined,
+            idlFactory.createMethodCall(
+                "WeakMap",
+                "set",
+                factory.createIdentifier("cache"),
                 [
                     factory.createIdentifier("value"),
                     factory.createIdentifier("converted")

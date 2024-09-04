@@ -1,12 +1,14 @@
 import type ts from "typescript";
-import { type MetadataManager, makeMetadataMemoize } from "../metadata";
+import { makeMetadataMemoize } from "../metadata";
 import { isInternal } from "./isInternal";
 import { getConstructor } from "./getConstructor";
 
 export const isInternalConstructor = makeMetadataMemoize("internalConstructor",
-    (metadata: MetadataManager, symbol: ts.Symbol, treatMissingAsInternal: boolean, tsInstance: typeof ts, typeChecker: ts.TypeChecker): boolean => {
-        const constructor = getConstructor(metadata, symbol, tsInstance);
+    (symbol: ts.Symbol, treatMissingAsInternal: boolean, tsInstance: typeof ts, typeChecker: ts.TypeChecker): boolean => {
+        if (!symbol.valueDeclaration || !tsInstance.isClassDeclaration(symbol.valueDeclaration))
+            return false;
+        const constructor = getConstructor(symbol, tsInstance);
         return constructor ?
-            isInternal(metadata, constructor, typeChecker) :
+            isInternal(constructor, typeChecker) :
             treatMissingAsInternal;
     });

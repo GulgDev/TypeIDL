@@ -1,7 +1,6 @@
 import type ts from "typescript";
 import type { TransformerExtras, PluginConfig } from "ts-patch";
-import { makeMetadataManager, type MetadataManager } from "./metadata";
-import { resolve, relative, dirname } from "path";
+import { resolve, relative, dirname, sep } from "path";
 import { type IDLFactory, makeFactory } from "./factory";
 import { type TypeUtils, makeTypeUtils } from "./typeUtils";
 import makeVisitor from "./visitor";
@@ -21,7 +20,6 @@ export interface State {
     idlFactory: IDLFactory;
     config: IDLConfig;
     ctx: ts.TransformationContext;
-    metadata: MetadataManager;
 
     initializers: ts.Statement[];
     
@@ -90,11 +88,11 @@ function call(o, p, args) {
 }
 
 function mark(o, p) {
-    apply(setAdd, p, [o]);
+    apply(weakSetAdd, p, [o]);
 }
 
 function has(o, p) {
-    return apply(setHas, p, [o]);
+    return apply(weakSetHas, p, [o]);
 }
 
 function getMisc(k) {
@@ -109,7 +107,7 @@ const apply = Function.prototype.call.bind(Function.prototype.apply);
 
 const { get: weakMapGet, set: weakMapSet, delete: weakMapDelete } = WeakMap.prototype;
 const { get: mapGet, set: mapSet } = Map.prototype;
-const { add: setAdd, has: setHas } = Set.prototype;
+const { add: weakSetAdd, has: weakSetHas } = WeakSet.prototype;
 
 const misc = new Map();
 `.trimStart();
@@ -122,8 +120,10 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
     const typeChecker = program.getTypeChecker();
     const compilerOptions = program.getCompilerOptions();
 
+    if (!compilerOptions.strictNullChecks)
+        console.warn("This project has non-strict null checks! TypeIDL might not work correctly without the 'strictNullChecks' option being 'true'.");
+
     const typeUtils = makeTypeUtils(tsInstance, typeChecker);
-    const metadata = makeMetadataManager(typeChecker);
 
     const config: IDLConfig = {
         treatMissingConstructorAsInternal: !!(pluginConfig.treatMissingConstructorAsInternal ?? true),
@@ -133,7 +133,7 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
 
     let internalsContent = config.trustGlobals ? INTERNALS_INIT : INTERNALS_UNTRUSTED_GLOBALS_INIT;
 
-    const internalsFile = resolve(compilerOptions.outDir ?? ".", "__typeidl.js");
+    const internalsFile = resolve(compilerOptions.outDir ?? ".", "__typeidl.js").replaceAll(sep, "/");
 
     const internalsExports = ["get", "set", "delete_", "call", "mark", "has", "getMisc", "setMisc"];
     if (!config.trustGlobals)
@@ -143,7 +143,7 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
         "module.exports =" :
         "export";
     
-    tsInstance.sys.writeFile(internalsFile, internalsContent + makeInternalExports());
+    program.writeFile(internalsFile, internalsContent + makeInternalExports(), false);
 
     function makeInternalExports() {
         return `\n${exportsPrefix} { ${internalsExports.join(", ")} };\n`;
@@ -151,7 +151,7 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
 
     function appendInternal(name: string, value: string) {
         internalsExports.push(name);
-        tsInstance.sys.writeFile(internalsFile, (internalsContent += `const ${name} = ${value}\n`) + makeInternalExports());
+        program.writeFile(internalsFile, (internalsContent += `const ${name} = ${value}\n`) + makeInternalExports(), false);
     }
 
     return (ctx: ts.TransformationContext) => {
@@ -167,7 +167,7 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
                     )
                 ),
                 internalsFile
-            ).replace(/\\/g, "/").replace(/^(?=[^.])/, "./").replace(/\.js$/, "");
+            ).replaceAll(sep, "/").replace(/^(?=[^.])/, "./").replace(/\.js$/, "");
 
             const references: Map<ts.Identifier, { [key: string]: ts.Identifier }> = new Map();
 
@@ -188,20 +188,18 @@ export default function (program: ts.Program, pluginConfig: PluginConfig, { ts: 
                     tsInstance,
                     typeChecker,
                     factory,
-                    metadata,
                     config.trustGlobals
                 ),
                 config,
                 ctx,
-                metadata,
     
                 initializers,
     
                 addInternal(symbol: ts.Symbol) {
-                    appendInternal("internal" + metadata.getSymbolId(symbol), "new WeakMap();");
+                    appendInternal("internal" + tsInstance.getSymbolId(symbol), "new WeakMap();");
                 },
                 addMark(symbol: ts.Symbol) {
-                    appendInternal("internal" + metadata.getSymbolId(symbol), "new WeakSet();");
+                    appendInternal("internal" + tsInstance.getSymbolId(symbol), "new WeakSet();");
                 },
     
                 typeConverters: new WeakMap()

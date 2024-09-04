@@ -4,11 +4,13 @@ import makeConverter from "./converters";
 import stringifyType from "./util/stringifyType";
 
 export default function makeMethodValidators(
-    state: State, classSymbol: ts.Symbol, isStatic: boolean, signature: ts.Signature, errorMessage: string, needsThisCheck: boolean = true
+    state: State, classSymbol: ts.Symbol, isStatic: boolean, signature: ts.Signature, errorMessage: string
 ): ts.Statement[] {
     const { typeChecker, factory, idlFactory } = state;
 
     const result: ts.Statement[] = [];
+
+    let needsThisCheck = !isStatic;
 
     if (signature.thisParameter) {
         needsThisCheck = false;
@@ -63,34 +65,12 @@ export default function makeMethodValidators(
     if (needsThisCheck)
         result.push(
             factory.createIfStatement(
-                isStatic ?
-                    factory.createLogicalAnd(
-                        factory.createLogicalNot(
-                            factory.createCallExpression(
-                                factory.createPropertyAccessExpression(
-                                    factory.createPropertyAccessExpression(
-                                        idlFactory.createGlobalReference("Object"),
-                                        "isPrototypeOf"
-                                    ),
-                                    "call"
-                                ),
-                                undefined,
-                                [
-                                    idlFactory.createReference(classSymbol),
-                                    factory.createThis()
-                                ]
-                            )
-                        ),
-                        factory.createStrictInequality(
-                            factory.createThis(),
-                            idlFactory.createReference(classSymbol)
-                        )
-                    ) : factory.createLogicalNot(
-                        idlFactory.createInternalHasExpression(
-                            factory.createThis(),
-                            classSymbol
-                        )
-                    ),
+                factory.createLogicalNot(
+                    idlFactory.createInternalHasExpression(
+                        factory.createThis(),
+                        classSymbol
+                    )
+                ),
                 factory.createThrowStatement(
                     factory.createNewExpression(
                         idlFactory.createGlobalReference("TypeError"),
@@ -141,17 +121,17 @@ export default function makeMethodValidators(
         factory.createTryStatement(
             factory.createBlock(
                 signature.parameters
-                    .map((parameter, i) => {
+                    .map((parameter, index) => {
                         const type = typeChecker.getTypeOfSymbol(parameter);
                         return factory.createExpressionStatement(
                             factory.createAssignment(
-                                factory.createIdentifier(parameter.name),
+                                factory.createIdentifier("arg" + index),
                                 factory.createCallExpression(
                                     makeConverter(state, type),
                                     undefined,
                                     [
-                                        factory.createIdentifier(parameter.name),
-                                        factory.createStringLiteral(`parameter ${i + 1} is not of type '${stringifyType(state, type)}'.`)
+                                        factory.createIdentifier("arg" + index),
+                                        factory.createStringLiteral(`parameter ${index + 1} is not of type '${stringifyType(state, type)}'.`)
                                     ]
                                 )
                             )

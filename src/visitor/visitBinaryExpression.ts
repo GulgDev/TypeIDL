@@ -1,35 +1,48 @@
 import type ts from "typescript";
 import type { State } from "..";
 import type { Visitor } from "./util";
+import { getSymbolMetadata } from "../metadata";
+import { createMirror } from "../util/createMirror";
+import { hasIDL } from "../util/hasIDL";
 import { isInternal } from "../util/isInternal";
 import { isGlobal } from "../util/isGlobal";
 import visitNode from "./util/visitNode";
 import visitEachChild from "./util/visitEachChild";
 
 export const visitBinaryExpression = (state: State, visitor: Visitor): Visitor<ts.BinaryExpression> => (_hint, node) => {
-    const { tsInstance, typeChecker, factory, idlFactory, config, ctx, metadata } = state;
+    const { tsInstance, typeChecker, typeUtils, factory, idlFactory, config, ctx } = state;
 
     if (node.operatorToken.kind !== tsInstance.SyntaxKind.EqualsToken ||
         !tsInstance.isPropertyAccessExpression(node.left))
         return visitEachChild(tsInstance, node, visitor, ctx);
     
-    const symbol = typeChecker.getSymbolAtLocation(node.left.name);
-    if (!symbol)
-        return visitEachChild(tsInstance, node, visitor, ctx);
+        let symbol = typeChecker.getSymbolAtLocation(node.left.name);
+        if (!symbol)
+            return visitEachChild(tsInstance, node, visitor, ctx);
+        symbol = tsInstance.getSymbolTarget(symbol, typeChecker);
 
-    if (isInternal(metadata, symbol, typeChecker))
+    if (isInternal(symbol, typeChecker))
         return idlFactory.createInternalSetExpression(
             visitEachChild(tsInstance, node.left.expression, visitor, ctx),
             symbol,
-            visitEachChild(tsInstance, node.right, visitor, ctx)
+            visitNode(tsInstance, node.right, visitor) as ts.Expression
+        );
+    
+    const parent = typeChecker.getSymbolAtLocation(node.left.expression);
+    
+    if (parent && hasIDL(parent, config.useIDLDecorator, tsInstance, typeUtils))
+        return idlFactory.createInternalSetExpression(
+            visitEachChild(tsInstance, node.left.expression, visitor, ctx),
+            createMirror(symbol, typeChecker),
+            visitNode(tsInstance, node.right, visitor) as ts.Expression
         );
     
     if (config.trustGlobals)
-        return node;    
+        return node;
 
-    const parent = typeChecker.getSymbolAtLocation(node.left.expression);
+    const type = typeChecker.getApparentType(typeChecker.getTypeAtLocation(node.left));
     
-    node = factory.updateBinaryExpression(
+    node = factory.updateBinaryExpression( // TODO: Why is node.right not visited in 'this.stringProperty = (a + b).toString();'?
         node,
         visitEachChild(tsInstance, node.left, visitor, ctx),
         node.operatorToken,
@@ -38,7 +51,7 @@ export const visitBinaryExpression = (state: State, visitor: Visitor): Visitor<t
     if (!tsInstance.isPropertyAccessExpression(node.left))
         throw new TypeError("Expected property access expression");
 
-    if (parent && (metadata.getSymbolMetadata(symbol).intrinsic = metadata.getSymbolMetadata(parent).intrinsic))
+    if (parent && (getSymbolMetadata(symbol).intrinsic = getSymbolMetadata(parent).intrinsic))
         return factory.updateBinaryExpression(
             node,
             idlFactory.createPropertyReference(node.left.expression, symbol.name),
@@ -46,8 +59,7 @@ export const visitBinaryExpression = (state: State, visitor: Visitor): Visitor<t
             node.right
         );
 
-    const type = typeChecker.getTypeAtLocation(node.left.expression);
-    if (type.symbol && isGlobal(metadata, type.symbol, tsInstance, typeChecker))
+    if (type.symbol && isGlobal(type.symbol, tsInstance, typeChecker))
         return idlFactory.createFunctionApplyCall(
             idlFactory.createInstancePropertyAccessorsReference(
                 idlFactory.createGlobalReference(type.symbol.name),

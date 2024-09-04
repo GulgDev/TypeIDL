@@ -10,7 +10,7 @@ export const makeCreateInstanceMethodReference =
     (parent: ts.Expression, name: string): ts.Identifier => {
         let methodReferences = references.get(parent);
         if (!methodReferences) {
-            methodReferences = {};
+            methodReferences = Object.create(null) as { [key: string]: ts.Identifier };
             references.set(parent, methodReferences);
         }
 

@@ -1,8 +1,7 @@
 import type ts from "typescript";
-import type { MetadataManager } from "../metadata";
 
 export const makeCreateInternalDeleteExpression =
-    (internals: ts.Identifier, factory: ts.NodeFactory, metadata: MetadataManager) =>
+    (internals: ts.Identifier, tsInstance: typeof ts, factory: ts.NodeFactory) =>
     (expression: ts.Expression, symbol: ts.Symbol): ts.Expression =>
         factory.createCallExpression(
             factory.createPropertyAccessExpression(internals, "delete_"),
@@ -11,7 +10,7 @@ export const makeCreateInternalDeleteExpression =
                 expression,
                 factory.createPropertyAccessExpression(
                     internals,
-                    `internal${metadata.getSymbolId(symbol)}`
+                    `internal${tsInstance.getSymbolId(symbol)}`
                 )
             ]
         );

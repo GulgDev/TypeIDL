@@ -10,7 +10,7 @@ export const makeCreateInstancePropertyAccessorsReference =
     (parent: ts.Expression, name: string): [ts.Identifier, ts.Identifier] => {
         let propertyReferences = references.get(parent);
         if (!propertyReferences) {
-            propertyReferences = {};
+            propertyReferences = Object.create(null) as { [key: string]: [ts.Identifier, ts.Identifier] };
             references.set(parent, propertyReferences);
         }
 
@@ -78,16 +78,20 @@ export const makeCreateInstancePropertyAccessorsReference =
                         ]),
                         undefined,
                         undefined,
-                        factory.createCallExpression(
-                            factory.createPropertyAccessExpression(
-                                factory.createIdentifier("Reflect"),
-                                "getOwnPropertyDescriptor"
+                        factory.createBinaryExpression(
+                            factory.createCallExpression(
+                                factory.createPropertyAccessExpression(
+                                    factory.createIdentifier("Reflect"),
+                                    "getOwnPropertyDescriptor"
+                                ),
+                                undefined,
+                                [factory.createPropertyAccessExpression(
+                                    parent,
+                                    "prototype"
+                                )]
                             ),
-                            undefined,
-                            [factory.createPropertyAccessExpression(
-                                parent,
-                                "prototype"
-                            )]
+                            tsInstance.SyntaxKind.QuestionQuestionToken,
+                            factory.createObjectLiteralExpression()
                         )
                     )
                 ], tsInstance.NodeFlags.Const)

@@ -1,8 +1,15 @@
 import type ts from "typescript";
-import { type MetadataManager, makeMetadataMemoize } from "../metadata";
+import { makeMetadataMemoize } from "../metadata";
 
 export const isGlobal = makeMetadataMemoize("global",
-    (_metadata: MetadataManager, symbol: ts.Symbol, tsInstance: typeof ts, typeChecker: ts.TypeChecker): boolean =>
+    (symbol: ts.Symbol, tsInstance: typeof ts, typeChecker: ts.TypeChecker): boolean =>
+        symbol.valueDeclaration !== undefined &&
+        (
+            !tsInstance.isFunctionDeclaration(symbol.valueDeclaration) ||
+            (tsInstance.modifiersToFlags(
+                symbol.valueDeclaration.modifiers
+            ) & tsInstance.ModifierFlags.Ambient) !== 0
+        ) &&
         typeChecker.getTypeOfSymbol(
             typeChecker.resolveName("globalThis", undefined, tsInstance.SymbolFlags.NamespaceModule, false)!
         ).getProperty(symbol.name) === symbol);

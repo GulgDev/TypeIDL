@@ -1,6 +1,9 @@
 import type ts from "typescript";
 import type { State } from "..";
 import type { Visitor } from "./util";
+import { getSymbolMetadata } from "../metadata";
+import { createMirror } from "../util/createMirror";
+import { hasIDL } from "../util/hasIDL";
 import { isInternal } from "../util/isInternal";
 import { isGlobal } from "../util/isGlobal";
 import visitNode from "./util/visitNode";
@@ -8,20 +11,34 @@ import visitNodes from "./util/visitNodes";
 import visitEachChild from "./util/visitEachChild";
 
 export const visitCallExpression = (state: State, visitor: Visitor): Visitor<ts.CallExpression> => (_hint, node) => {
-    const { tsInstance, typeChecker, factory, idlFactory, config, ctx, metadata } = state;
+    const { tsInstance, typeChecker, typeUtils, factory, idlFactory, config, ctx } = state;
 
     if (!tsInstance.isPropertyAccessExpression(node.expression))
         return visitEachChild(tsInstance, node, visitor, ctx);
 
-    const symbol = typeChecker.getSymbolAtLocation(node.expression.name);
+    let symbol = typeChecker.getSymbolAtLocation(node.expression.name);
     if (!symbol)
         return visitEachChild(tsInstance, node, visitor, ctx);
+    symbol = tsInstance.getSymbolTarget(symbol, typeChecker);
 
-    if (isInternal(metadata, symbol, typeChecker))
+    if (isInternal(symbol, typeChecker))
         return idlFactory.createInternalCallExpression(
             visitNode(tsInstance, node.expression.expression, visitor) as ts.Expression,
             symbol,
-            visitNodes(tsInstance, node.arguments, visitor) as ts.NodeArray<ts.Expression>
+            factory.createArrayLiteralExpression(
+                visitNodes(tsInstance, node.arguments, visitor) as ts.NodeArray<ts.Expression>
+            )
+        );
+    
+    const parent = typeChecker.getSymbolAtLocation(node.expression.expression);
+    
+    if (parent && hasIDL(parent, config.useIDLDecorator, tsInstance, typeUtils))
+        return idlFactory.createInternalCallExpression(
+            visitNode(tsInstance, node.expression.expression, visitor) as ts.Expression,
+            createMirror(symbol, typeChecker),
+            factory.createArrayLiteralExpression(
+                visitNodes(tsInstance, node.arguments, visitor) as ts.NodeArray<ts.Expression>
+            )
         );
     
     if (config.trustGlobals)
@@ -51,7 +68,7 @@ export const visitCallExpression = (state: State, visitor: Visitor): Visitor<ts.
             );
     }
 
-    const parent = typeChecker.getSymbolAtLocation(node.expression.expression);
+    const type = typeChecker.getApparentType(typeChecker.getTypeAtLocation(node.expression.expression));
     
     node = factory.updateCallExpression(
         node,
@@ -61,19 +78,17 @@ export const visitCallExpression = (state: State, visitor: Visitor): Visitor<ts.
     );
     if (!tsInstance.isPropertyAccessExpression(node.expression))
         throw new TypeError("Expected property access expression");
-
-    const type = typeChecker.getTypeAtLocation(node.expression.expression);
     
     let method;
-    if (parent && (metadata.getSymbolMetadata(symbol).intrinsic = metadata.getSymbolMetadata(parent).intrinsic))
+    if (parent && (getSymbolMetadata(symbol).intrinsic = getSymbolMetadata(parent).intrinsic))
         method = idlFactory.createPropertyReference(node.expression.expression, symbol.name);
-    else if (type.symbol && isGlobal(metadata, type.symbol, tsInstance, typeChecker))
+    else if (type.symbol && isGlobal(type.symbol, tsInstance, typeChecker))
         method = idlFactory.createInstanceMethodReference(
             idlFactory.createGlobalReference(type.symbol.name),
             symbol.name
         );
     else
-        return visitEachChild(tsInstance, node, visitor, ctx);
+        return node;
 
     return idlFactory.createFunctionApplyCall(
         method,
