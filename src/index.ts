@@ -29,9 +29,6 @@ export interface State {
     typeConverters: WeakMap<ts.Type, ts.Expression>;
 }
 
-// @TODO: Add checks for `trustGlobals` flag to visitIdentifier, visitCallExpression, visitPropertyAccessExpression and visitBinaryExpression
-// @TODO: Fix bug with accessing static props
-
 const INTERNALS_INIT = `
 function get(o, p) {
     return p.get(o);

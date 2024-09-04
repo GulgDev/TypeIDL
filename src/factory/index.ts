@@ -16,7 +16,7 @@ import { makeCreateReference } from "./createReference";
 import { makeCreateInstancePropertyAccessorsReference } from "./createInstancePropertyAccessorsReference";
 import { makeCreateInstanceMethodReference } from "./createInstanceMethodReference";
 
-// @TODO: Pass getIDLFactory function
+// TODO: Pass getIDLFactory function
 
 export interface IDLFactory {
     createFunctionApplyCall(target: ts.Expression, thisArg: ts.Expression, argumentsExpression?: ts.Expression): ts.CallExpression;

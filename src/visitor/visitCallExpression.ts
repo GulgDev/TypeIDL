@@ -78,6 +78,9 @@ export const visitCallExpression = (state: State, visitor: Visitor): Visitor<ts.
     );
     if (!tsInstance.isPropertyAccessExpression(node.expression))
         throw new TypeError("Expected property access expression");
+
+    if (parent && (getSymbolMetadata(symbol).fresh = getSymbolMetadata(parent).fresh))
+        return node;
     
     let method;
     if (parent && (getSymbolMetadata(symbol).intrinsic = getSymbolMetadata(parent).intrinsic))

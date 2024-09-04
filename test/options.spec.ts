@@ -7,13 +7,23 @@ describe("Options", () => {
         const { object } = await compileAndLoad(`
             class Test {
                 callStaticMethod() {
+                    equal(globalThis.Array["isArray"]([]), false);
+
                     equal(Array.isArray([]), true);
                 }
 
                 callMethod() {
-                    const array: any[] = [];
-                    array.push(123);
-                    equal(array.length, 1);
+                    {
+                        const array: any[] = [];
+                        array["push"](123);
+                        equal(array.length, 0);
+                    }
+
+                    {
+                        const array: any[] = [];
+                        array.push(123);
+                        equal(array.length, 1);
+                    }
                 }
             }
         

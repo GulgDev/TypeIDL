@@ -38,6 +38,9 @@ export const visitPropertyAccessExpression = (state: State, visitor: Visitor): V
     if (config.trustGlobals)
         return node;
 
+    if (parent && (getSymbolMetadata(symbol).fresh = getSymbolMetadata(parent).fresh))
+        return node;
+
     if (parent && (getSymbolMetadata(symbol).intrinsic = getSymbolMetadata(parent).intrinsic))
         return idlFactory.createPropertyReference(node.expression, symbol.name);
 

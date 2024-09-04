@@ -42,7 +42,7 @@ export const visitBinaryExpression = (state: State, visitor: Visitor): Visitor<t
 
     const type = typeChecker.getApparentType(typeChecker.getTypeAtLocation(node.left));
     
-    node = factory.updateBinaryExpression( // TODO: Why is node.right not visited in 'this.stringProperty = (a + b).toString();'?
+    node = factory.updateBinaryExpression(
         node,
         visitEachChild(tsInstance, node.left, visitor, ctx),
         node.operatorToken,
@@ -50,6 +50,9 @@ export const visitBinaryExpression = (state: State, visitor: Visitor): Visitor<t
     );
     if (!tsInstance.isPropertyAccessExpression(node.left))
         throw new TypeError("Expected property access expression");
+
+    if (parent && (getSymbolMetadata(symbol).fresh = getSymbolMetadata(parent).fresh))
+        return visitEachChild(tsInstance, node, visitor, ctx);
 
     if (parent && (getSymbolMetadata(symbol).intrinsic = getSymbolMetadata(parent).intrinsic))
         return factory.updateBinaryExpression(

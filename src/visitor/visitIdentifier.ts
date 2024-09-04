@@ -17,7 +17,8 @@ export const visitIdentifier = (state: State): Visitor<ts.Identifier> => (hint, 
     if (!symbol)
         return node;
 
-    if (getSymbolMetadata(symbol).intrinsic = symbol.name !== "globalThis" && isGlobal(symbol, tsInstance, typeChecker))
+    if (!(getSymbolMetadata(symbol).fresh = symbol.name === "globalThis") &&
+         (getSymbolMetadata(symbol).intrinsic = isGlobal(symbol, tsInstance, typeChecker)))
         return idlFactory.createGlobalReference(node.text);
     
     return node;
