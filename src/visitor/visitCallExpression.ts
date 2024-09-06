@@ -68,7 +68,12 @@ export const visitCallExpression = (state: State, visitor: Visitor): Visitor<ts.
             );
     }
 
-    const type = typeChecker.getApparentType(typeChecker.getTypeAtLocation(node.expression.expression));
+    const type =
+        (symbol.parent && typeChecker.getTypeOfPropertyOfType(
+            typeChecker.getTypeOfSymbol(symbol.parent),
+            "prototype"
+        )) ??
+        typeChecker.getApparentType(typeChecker.getTypeAtLocation(node.expression.expression));
     
     node = factory.updateCallExpression(
         node,
